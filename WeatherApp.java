@@ -6,6 +6,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import org.json.JSONObject;
 
 public class WeatherApp extends JFrame implements ActionListener {
@@ -14,6 +18,9 @@ public class WeatherApp extends JFrame implements ActionListener {
     private JTextArea resultArea;
 
     private static final String API_KEY = "your_api_key"; // Replace with your OpenWeatherMap API key
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/WeatherDB";
+    private static final String DB_USER = "root"; // Replace with your database username
+    private static final String DB_PASSWORD = "your_password"; // Replace with your database password
 
     public WeatherApp() {
         setTitle("Weather App");
@@ -71,6 +78,7 @@ public class WeatherApp extends JFrame implements ActionListener {
             conn.disconnect();
 
             parseAndDisplayWeatherData(content.toString());
+            saveWeatherDataToDatabase(city, content.toString());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error fetching weather data. Please check the city name and try again.");
         }
@@ -98,8 +106,39 @@ public class WeatherApp extends JFrame implements ActionListener {
         }
     }
 
+    private void saveWeatherDataToDatabase(String city, String jsonResponse) {
+        try {
+            // Parse the JSON response to get the required fields
+            JSONObject jsonObj = new JSONObject(jsonResponse);
+            JSONObject main = jsonObj.getJSONObject("main");
+            double temp = main.getDouble("temp");
+            int humidity = main.getInt("humidity");
+            JSONObject weatherObj = jsonObj.getJSONArray("weather").getJSONObject(0);
+            String weatherDescription = weatherObj.getString("description");
+
+            // Establish a connection to the database
+            Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            // Prepare an SQL statement to insert weather data
+            String sql = "INSERT INTO WeatherData (city, temperature, humidity, weather_description) VALUES (?, ?, ?, ?)";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, city);
+            pstmt.setDouble(2, temp);
+            pstmt.setInt(3, humidity);
+            pstmt.setString(4, weatherDescription);
+
+            // Execute the statement
+            pstmt.executeUpdate();
+
+            // Close the connection
+            pstmt.close();
+            conn.close();
+        } catch (SQLException | org.json.JSONException ex) {
+            JOptionPane.showMessageDialog(this, "Error saving weather data to the database.");
+        }
+    }
+
     public static void main(String[] args) {
         new WeatherApp();
     }
 }
-
